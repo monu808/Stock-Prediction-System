@@ -1,0 +1,191 @@
+# Trading System Configuration
+# Copy this file to config.yaml and customize for your environment
+
+# API Configuration
+api:
+  host: "0.0.0.0"
+  port: 8000
+  cors_origins: ["*"]
+  jwt_secret: "your-secret-key-here"
+  rate_limit: 1000  # requests per minute
+
+# Database Configuration
+databases:
+  influxdb:
+    url: "http://localhost:8086"
+    token: "your-influxdb-token"
+    org: "trading_org"
+    bucket: "market_data"
+  
+  postgres:
+    host: "localhost"
+    port: 5432
+    database: "trading_db"
+    username: "admin"
+    password: "password123"
+  
+  redis:
+    host: "localhost"
+    port: 6379
+    password: null
+    db: 0
+
+# Message Queue Configuration
+kafka:
+  bootstrap_servers: ["localhost:9092"]
+  topics:
+    market_data: "market_data"
+    news_data: "news_data"
+    signals: "trading_signals"
+    alerts: "alerts"
+
+# Data Sources Configuration
+data_sources:
+  # Market Data
+  nse:
+    enabled: true
+    api_key: "your-nse-api-key"
+    rate_limit: 100  # requests per second
+  
+  bse:
+    enabled: true
+    api_key: "your-bse-api-key"
+    rate_limit: 100
+  
+  yahoo_finance:
+    enabled: true
+    rate_limit: 2000  # requests per hour
+  
+  alpha_vantage:
+    enabled: false
+    api_key: "your-alpha-vantage-key"
+    rate_limit: 5  # requests per minute
+  
+  # News Sources
+  news_sources:
+    economic_times:
+      enabled: true
+      url: "https://economictimes.indiatimes.com"
+      rate_limit: 60
+    
+    moneycontrol:
+      enabled: true
+      url: "https://www.moneycontrol.com"
+      rate_limit: 60
+    
+    bloomberg_quint:
+      enabled: true
+      url: "https://www.bloombergquint.com"
+      rate_limit: 60
+  
+  # Social Media
+  twitter:
+    enabled: false
+    bearer_token: "your-twitter-bearer-token"
+    rate_limit: 300  # requests per 15 minutes
+
+# Model Configuration
+models:
+  # LSTM Model for Price Prediction
+  lstm_price:
+    enabled: true
+    sequence_length: 60
+    hidden_units: [128, 64, 32]
+    dropout: 0.2
+    learning_rate: 0.001
+    batch_size: 32
+    epochs: 100
+    lookback_days: 252  # 1 year of trading days
+  
+  # Transformer for News Sentiment
+  transformer_sentiment:
+    enabled: true
+    model_name: "bert-base-uncased"
+    max_length: 512
+    batch_size: 16
+    learning_rate: 2e-5
+    epochs: 3
+  
+  # Graph Neural Network for Sector Analysis
+  gnn_sector:
+    enabled: true
+    hidden_channels: 64
+    num_layers: 3
+    dropout: 0.1
+    learning_rate: 0.01
+
+# Risk Management Configuration
+risk_management:
+  max_position_size: 0.05  # 5% of portfolio per position
+  max_portfolio_risk: 0.02  # 2% daily VaR
+  stop_loss_percentage: 0.03  # 3% stop loss
+  take_profit_percentage: 0.06  # 6% take profit
+  correlation_threshold: 0.7  # Maximum correlation between positions
+  
+  # Circuit Breakers
+  circuit_breakers:
+    daily_loss_limit: 0.05  # 5% daily loss limit
+    consecutive_losses: 5  # Stop after 5 consecutive losses
+    volatility_threshold: 0.04  # 4% volatility threshold
+
+# Signal Generation Configuration
+signals:
+  confidence_threshold: 0.6  # Minimum confidence for signal generation
+  ensemble_weights:
+    technical: 0.3
+    fundamental: 0.2
+    sentiment: 0.2
+    macro: 0.15
+    momentum: 0.15
+  
+  timeframes:
+    millisecond: true   # High-frequency signals
+    minute: true        # Intraday signals
+    hourly: true        # Short-term signals
+    daily: true         # Swing trading signals
+    weekly: false       # Long-term signals
+
+# Monitoring Configuration
+monitoring:
+  prometheus:
+    enabled: true
+    port: 8001
+    metrics_interval: 10  # seconds
+  
+  logging:
+    level: "INFO"
+    format: "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
+    max_file_size: "100MB"
+    backup_count: 5
+  
+  alerts:
+    email:
+      enabled: false
+      smtp_server: "smtp.gmail.com"
+      smtp_port: 587
+      username: "your-email@gmail.com"
+      password: "your-app-password"
+    
+    webhook:
+      enabled: false
+      url: "https://hooks.slack.com/services/your/webhook/url"
+
+# Backtesting Configuration
+backtesting:
+  start_date: "2020-01-01"
+  end_date: "2023-12-31"
+  initial_capital: 1000000  # 10 Lakhs INR
+  commission: 0.001  # 0.1% commission
+  slippage: 0.0005  # 0.05% slippage
+  benchmark: "^NSEI"  # Nifty 50 as benchmark
+
+# Performance Optimization
+performance:
+  max_workers: 4  # Number of worker processes
+  batch_size: 1000  # Batch size for processing
+  cache_ttl: 300  # Cache TTL in seconds
+  compression: true  # Enable data compression
+  
+  gpu:
+    enabled: false  # Set to true if GPU is available
+    device: "cuda:0"  # GPU device

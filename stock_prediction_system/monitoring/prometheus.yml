@@ -1,0 +1,52 @@
+# Prometheus configuration for trading system monitoring
+global:
+  scrape_interval: 15s
+  evaluation_interval: 15s
+
+rule_files:
+  # - "first_rules.yml"
+  # - "second_rules.yml"
+
+scrape_configs:
+  # Trading system metrics
+  - job_name: 'trading-system'
+    static_configs:
+      - targets: ['localhost:8001']  # Prometheus metrics endpoint
+    scrape_interval: 5s
+    metrics_path: /metrics
+
+  # System metrics
+  - job_name: 'node-exporter'
+    static_configs:
+      - targets: ['localhost:9100']
+    scrape_interval: 10s
+
+  # Database metrics
+  - job_name: 'postgres-exporter'
+    static_configs:
+      - targets: ['localhost:9187']
+    scrape_interval: 10s
+
+  - job_name: 'influxdb'
+    static_configs:
+      - targets: ['localhost:8086']
+    scrape_interval: 10s
+    metrics_path: /metrics
+
+  # Redis metrics
+  - job_name: 'redis-exporter'
+    static_configs:
+      - targets: ['localhost:9121']
+    scrape_interval: 10s
+
+alerting:
+  alertmanagers:
+    - static_configs:
+        - targets:
+          # - alertmanager:9093
+
+# Storage configuration
+storage:
+  tsdb:
+    retention.time: 30d
+    retention.size: 10GB

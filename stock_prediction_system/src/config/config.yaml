@@ -1,0 +1,24 @@
+api:
+  cors_origins:
+  - '*'
+  host: 0.0.0.0
+  jwt_secret: default-secret-key
+  port: 8000
+  rate_limit: 1000
+databases:
+  influxdb:
+    bucket: market_data
+    org: trading_org
+    token: your-token-here
+    url: http://localhost:8086
+  postgres:
+    database: trading_db
+    host: localhost
+    password: password123
+    port: 5432
+    username: admin
+  redis:
+    db: 0
+    host: localhost
+    password: null
+    port: 6379
