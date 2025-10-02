@@ -42,6 +42,7 @@ class DataSourceConfig:
     alpha_vantage: Dict[str, Any] = field(default_factory=dict)
     news_sources: Dict[str, Any] = field(default_factory=dict)
     twitter: Dict[str, Any] = field(default_factory=dict)
+    mock_provider: Dict[str, Any] = field(default_factory=dict)
 
 
 @dataclass
@@ -111,10 +112,12 @@ class Config:
         
         for path in possible_paths:
             if path.exists():
+                print(f"Found config file: {path}")
                 return str(path)
         
         # Create default config if none found
         default_path = Path(__file__).parent.parent / "config" / "config.yaml"
+        print(f"No config file found, creating default at: {default_path}")
         self._create_default_config(default_path)
         return str(default_path)
     
@@ -123,6 +126,9 @@ class Config:
         try:
             with open(self.config_path, 'r') as file:
                 config = yaml.safe_load(file)
+            
+            print(f"Loaded config from {self.config_path}")
+            print(f"data_sources section: {config.get('data_sources', {})}")
                 
             # Environment variable substitution
             config = self._substitute_env_vars(config)
@@ -218,7 +224,8 @@ class Config:
             yahoo_finance=data_sources.get("yahoo_finance", {}),
             alpha_vantage=data_sources.get("alpha_vantage", {}),
             news_sources=data_sources.get("news_sources", {}),
-            twitter=data_sources.get("twitter", {})
+            twitter=data_sources.get("twitter", {}),
+            mock_provider=data_sources.get("mock_provider", {})
         )
     
     def _create_model_config(self) -> ModelConfig:

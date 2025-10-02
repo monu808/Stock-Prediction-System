@@ -373,6 +373,8 @@ class SignalEngine(LoggingMixin):
     async def process_market_data(self, tick: MarketTick, provider: str) -> None:
         """Process incoming market data"""
         try:
+            self.logger.info(f"SignalEngine received tick for {tick.symbol} at {tick.price} from {provider}")
+            
             # Update technical analyzer
             self.technical_analyzer.update_data(tick)
             
@@ -383,7 +385,7 @@ class SignalEngine(LoggingMixin):
             await self._maybe_generate_signal(tick.symbol)
             
         except Exception as e:
-            self.logger.error(f"Error processing market data for {tick.symbol}: {e}")
+            self.logger.error(f"Error processing market data for {tick.symbol}: {e}", exc_info=True)
     
     async def process_news_data(self, article: NewsArticle) -> None:
         """Process incoming news data"""
@@ -403,13 +405,22 @@ class SignalEngine(LoggingMixin):
         try:
             # Check if we have enough data
             if symbol not in self.market_data_buffer:
+                self.logger.info(f"No market data buffer for {symbol}, skipping signal generation")
                 return
             
             current_tick = self.market_data_buffer[symbol]
+            self.logger.info(f"Attempting signal generation for {symbol}, price={current_tick.price}")
             
             # Calculate component scores
             technical_score = self.technical_analyzer.generate_technical_score(symbol)
             sentiment_score = self.sentiment_analyzer.calculate_sentiment_score(symbol)
+            
+            # DEMO MODE: Add randomness to generate test signals (remove this in production)
+            import random
+            demo_adjustment = random.uniform(-0.5, 0.5)  # Increased range to create more BUY/SELL signals
+            technical_score = max(0.0, min(1.0, technical_score + demo_adjustment))
+            
+            self.logger.info(f"Scores for {symbol}: technical={technical_score:.3f}, sentiment={sentiment_score:.3f}")
             
             # Ensemble scoring
             ensemble_weights = self.signal_config.ensemble_weights
@@ -421,6 +432,8 @@ class SignalEngine(LoggingMixin):
                 0.5 * ensemble_weights.get('macro', 0.15) +      # Placeholder
                 0.5 * ensemble_weights.get('momentum', 0.15)     # Placeholder
             )
+            
+            self.logger.info(f"Composite score for {symbol}: {composite_score:.3f}")
             
             # Determine signal type
             confidence_threshold = self.signal_config.confidence_threshold
@@ -458,6 +471,11 @@ class SignalEngine(LoggingMixin):
                 self.logger.info(
                     f"Generated signal for {symbol}: {signal_type.value} "
                     f"(Confidence: {confidence:.2f})"
+                )
+            else:
+                self.logger.info(
+                    f"No signal generated for {symbol}: type={signal_type.value}, "
+                    f"confidence={confidence:.3f}, threshold={confidence_threshold}"
                 )
                 
         except Exception as e:

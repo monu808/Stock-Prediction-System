@@ -4,6 +4,7 @@ import asyncio
 import aiohttp
 import json
 import time
+import random
 from datetime import datetime, timedelta
 from typing import Dict, List, Optional, Any
 from dataclasses import dataclass
@@ -242,6 +243,7 @@ class YahooFinanceProvider(LoggingMixin):
         self.config = config
         self.session: Optional[aiohttp.ClientSession] = None
         self.base_url = "https://query1.finance.yahoo.com/v8/finance/chart"
+        self.subscribed_symbols = set()
     
     async def initialize(self) -> None:
         """Initialize Yahoo Finance provider"""
@@ -249,6 +251,11 @@ class YahooFinanceProvider(LoggingMixin):
             timeout=aiohttp.ClientTimeout(total=30)
         )
         self.logger.info("Yahoo Finance provider initialized")
+    
+    async def subscribe_symbol(self, symbol: str) -> None:
+        """Subscribe to symbol updates"""
+        self.subscribed_symbols.add(symbol)
+        self.logger.debug(f"Yahoo subscribed to symbol: {symbol}")
     
     async def fetch_quote(self, symbol: str) -> Optional[MarketTick]:
         """Fetch quote from Yahoo Finance"""
@@ -301,6 +308,66 @@ class YahooFinanceProvider(LoggingMixin):
         self.logger.info("Yahoo Finance provider closed")
 
 
+class MockProvider(LoggingMixin):
+    """In-memory mock provider that emits synthetic ticks for testing."""
+
+    def __init__(self, config: Dict[str, Any]):
+        self.config = config
+        self.is_running = False
+        self.subscribed_symbols = set()
+        # Maintain last prices per symbol for a simple random-walk
+        self._last_prices: Dict[str, float] = {}
+
+    async def initialize(self) -> None:
+        """No-op initialize for mock provider"""
+        # seed some plausible starting prices if provided
+        seed_prices = self.config.get('seed_prices', {})
+        for sym, p in seed_prices.items():
+            try:
+                self._last_prices[sym] = float(p)
+            except Exception:
+                self._last_prices[sym] = 100.0
+
+        self.logger.info("Mock provider initialized")
+
+    async def subscribe_symbol(self, symbol: str) -> None:
+        self.subscribed_symbols.add(symbol)
+        # seed default price if not present
+        if symbol not in self._last_prices:
+            self._last_prices[symbol] = float(self.config.get('default_price', 100.0))
+        self.logger.debug(f"Mock subscribed to symbol: {symbol}")
+
+    async def fetch_quote(self, symbol: str) -> Optional[MarketTick]:
+        """Return a synthetic MarketTick using a small random-walk around last price"""
+        try:
+            base = self._last_prices.get(symbol, float(self.config.get('default_price', 100.0)))
+            # Larger random walk step to create more varied signals (increased from 0.002 to 0.01)
+            step = random.uniform(-2.0, 2.0) * max(0.1, base * 0.01)
+            price = max(0.01, base + step)
+            self._last_prices[symbol] = price
+
+            tick = MarketTick(
+                symbol=symbol,
+                timestamp=datetime.now(),
+                price=round(price, 2),
+                volume=int(random.uniform(100, 10000)),
+                bid_price=round(price - 0.05, 2),
+                ask_price=round(price + 0.05, 2),
+                bid_size=int(random.uniform(1, 50)),
+                ask_size=int(random.uniform(1, 50)),
+                exchange="MOCK",
+            )
+
+            self.logger.debug(f"Mock emitted tick for {symbol}: {tick}")
+            return tick
+        except Exception as e:
+            self.logger.error(f"Error generating mock tick for {symbol}: {e}")
+            return None
+
+    async def close(self) -> None:
+        self.logger.info("Mock provider closed")
+
+
 class MarketDataCollector(LoggingMixin):
     """Main market data collector orchestrating multiple providers"""
     
@@ -310,15 +377,28 @@ class MarketDataCollector(LoggingMixin):
         self.is_running = False
         self.data_callbacks = []
         
+        self.logger.info(f"MarketDataCollector initializing with config keys: {list(config.keys())}")
+        
         # Initialize providers
         if config.get('nse', {}).get('enabled', False):
             self.providers['nse'] = NSEDataProvider(config['nse'])
+            self.logger.info("NSE provider will be initialized")
         
         if config.get('bse', {}).get('enabled', False):
             self.providers['bse'] = BSEDataProvider(config['bse'])
+            self.logger.info("BSE provider will be initialized")
         
         if config.get('yahoo_finance', {}).get('enabled', False):
             self.providers['yahoo'] = YahooFinanceProvider(config['yahoo_finance'])
+            self.logger.info("Yahoo Finance provider will be initialized")
+        
+        # Temporary/mock provider useful for testing and when external sources are blocked
+        if config.get('mock_provider', {}).get('enabled', False):
+            self.providers['mock'] = MockProvider(config.get('mock_provider', {}))
+            self.logger.info("Mock provider will be initialized")
+        
+        if not self.providers:
+            self.logger.warning("No data providers enabled! Check your config.yaml data_sources section")
     
     async def initialize(self) -> None:
         """Initialize all providers"""
@@ -334,31 +414,35 @@ class MarketDataCollector(LoggingMixin):
     
     async def start_collection(self, symbols: List[str], interval: float = 1.0) -> None:
         """Start real-time data collection"""
-        self.is_running = True
-        await self.subscribe_symbols(symbols)
-        
-        self.logger.info(f"Starting data collection for {len(symbols)} symbols")
-        
-        while self.is_running:
-            start_time = time.time()
+        try:
+            self.logger.info(f"start_collection called with {len(symbols)} symbols and {len(self.providers)} providers")
+            self.is_running = True
+            await self.subscribe_symbols(symbols)
             
-            # Collect data from all providers
-            tasks = []
-            for symbol in symbols:
-                for provider_name, provider in self.providers.items():
-                    task = asyncio.create_task(
-                        self._fetch_and_process(provider_name, provider, symbol)
-                    )
-                    tasks.append(task)
+            self.logger.info(f"Starting data collection for {len(symbols)} symbols")
             
-            # Wait for all tasks to complete
-            if tasks:
-                await asyncio.gather(*tasks, return_exceptions=True)
-            
-            # Maintain collection interval
-            elapsed = time.time() - start_time
-            if elapsed < interval:
-                await asyncio.sleep(interval - elapsed)
+            while self.is_running:
+                start_time = time.time()
+                
+                # Collect data from all providers
+                tasks = []
+                for symbol in symbols:
+                    for provider_name, provider in self.providers.items():
+                        task = asyncio.create_task(
+                            self._fetch_and_process(provider_name, provider, symbol)
+                        )
+                        tasks.append(task)
+                
+                # Wait for all tasks to complete
+                if tasks:
+                    await asyncio.gather(*tasks, return_exceptions=True)
+                
+                # Maintain collection interval
+                elapsed = time.time() - start_time
+                if elapsed < interval:
+                    await asyncio.sleep(interval - elapsed)
+        except Exception as e:
+            self.logger.error(f"Error in start_collection: {e}", exc_info=True)
     
     async def _fetch_and_process(self, provider_name: str, provider: Any, symbol: str) -> None:
         """Fetch data from provider and process it"""
@@ -376,12 +460,14 @@ class MarketDataCollector(LoggingMixin):
     
     async def _process_tick(self, tick: MarketTick, provider_name: str) -> None:
         """Process incoming tick data"""
+        self.logger.debug(f"_process_tick called for {tick.symbol}, forwarding to {len(self.data_callbacks)} callbacks")
         # Call all registered callbacks
         for callback in self.data_callbacks:
             try:
+                self.logger.debug(f"Calling callback: {callback}")
                 await callback(tick, provider_name)
             except Exception as e:
-                self.logger.error(f"Error in data callback: {e}")
+                self.logger.error(f"Error in data callback: {e}", exc_info=True)
     
     def add_data_callback(self, callback) -> None:
         """Add a callback function for processed data"""

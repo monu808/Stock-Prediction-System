@@ -1,24 +1,60 @@
+## Default configuration for the trading system
 api:
-  cors_origins:
-  - '*'
-  host: 0.0.0.0
-  jwt_secret: default-secret-key
+  host: "0.0.0.0"
   port: 8000
+  cors_origins:
+    - "*"
+  jwt_secret: "default-secret-key"
   rate_limit: 1000
+
 databases:
   influxdb:
-    bucket: market_data
-    org: trading_org
-    token: your-token-here
-    url: http://localhost:8086
+    url: "http://localhost:8086"
+    token: "your-token-here"
+    org: "trading_org"
+    bucket: "market_data"
   postgres:
-    database: trading_db
-    host: localhost
-    password: password123
+    host: "localhost"
     port: 5432
-    username: admin
+    database: "trading_db"
+    username: "admin"
+    password: "password123"
   redis:
-    db: 0
-    host: localhost
-    password: null
+    host: "localhost"
     port: 6379
+    password: null
+    db: 0
+
+# Data sources: enable one or more providers. NSE sometimes blocks automated clients.
+data_sources:
+  nse:
+    enabled: false
+    # Optionally add headers/cookies settings here when enabling NSE
+  bse:
+    enabled: false
+  yahoo_finance:
+    enabled: true
+    # Additional yahoo options can be added if needed
+
+  mock_provider:
+    enabled: true
+    default_price: 150.0
+    # optional per-symbol seed prices (example)
+    seed_prices: {}
+
+models:
+  lstm_price: {}
+  transformer_sentiment: {}
+  gnn_sector: {}
+
+risk_management: {}
+
+signals:
+  confidence_threshold: 0.4  # Lowered from 0.6 to allow signals with moderate confidence
+  ensemble_weights: {}
+  timeframes: {}
+
+monitoring:
+  logging: {}
+  prometheus: {}
+  alerts: {}

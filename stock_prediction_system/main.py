@@ -45,6 +45,16 @@ class TradingSystem:
             self.signal_engine = SignalEngine(self.config)
             await self.signal_engine.initialize()
             
+            # Connect data orchestrator to signal engine
+            # Market data flows: DataOrchestrator -> SignalEngine
+            self.data_orchestrator.add_market_data_callback(
+                self.signal_engine.process_market_data
+            )
+            self.data_orchestrator.add_news_data_callback(
+                self.signal_engine.process_news_data
+            )
+            self.logger.info("Connected data orchestrator callbacks to signal engine")
+            
             # Create FastAPI app
             self.app = create_app(self.config, self.signal_engine)
             

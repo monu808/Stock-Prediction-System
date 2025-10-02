@@ -36,11 +36,15 @@ class DataOrchestrator(LoggingMixin):
         try:
             # Initialize market data collector
             if self.config.data_sources:
-                self.market_collector = MarketDataCollector(self.config.data_sources.__dict__)
+                data_sources_dict = self.config.data_sources.__dict__
+                self.logger.info(f"Creating MarketDataCollector with config: {data_sources_dict}")
+                self.market_collector = MarketDataCollector(data_sources_dict)
                 await self.market_collector.initialize()
                 
                 # Add callback for market data
+                self.logger.info(f"Adding market data callback: {self._handle_market_data}")
                 self.market_collector.add_data_callback(self._handle_market_data)
+                self.logger.info(f"Market collector now has {len(self.market_collector.data_callbacks)} callbacks registered")
             
             # Initialize news aggregator
             if self.config.data_sources:
@@ -65,6 +69,7 @@ class DataOrchestrator(LoggingMixin):
         
         # Start market data collection
         if self.market_collector:
+            self.logger.info(f"Starting market data collection for {len(self.tracked_symbols)} symbols...")
             market_task = asyncio.create_task(
                 self.market_collector.start_collection(
                     symbols=self.tracked_symbols,
@@ -72,9 +77,12 @@ class DataOrchestrator(LoggingMixin):
                 )
             )
             tasks.append(market_task)
+        else:
+            self.logger.warning("Market collector is None, skipping market data collection")
         
         # Start news collection
         if self.news_aggregator:
+            self.logger.info("Starting news collection...")
             news_task = asyncio.create_task(
                 self.news_aggregator.start_news_collection(
                     interval=300  # 5 minutes interval
@@ -90,17 +98,18 @@ class DataOrchestrator(LoggingMixin):
         """Handle incoming market data"""
         try:
             # Log the data
-            self.logger.debug(
-                f"Market data - {tick.symbol}: {tick.price} "
-                f"(Vol: {tick.volume}) from {provider}"
+            self.logger.info(
+                f"Orchestrator received market data - {tick.symbol}: {tick.price} "
+                f"(Vol: {tick.volume}) from {provider}, forwarding to {len(self.market_data_callbacks)} callbacks"
             )
             
             # Call all registered callbacks
             for callback in self.market_data_callbacks:
+                self.logger.info(f"Calling callback: {callback}")
                 await callback(tick, provider)
                 
         except Exception as e:
-            self.logger.error(f"Error handling market data: {e}")
+            self.logger.error(f"Error handling market data: {e}", exc_info=True)
     
     async def _handle_news_data(self, article: NewsArticle) -> None:
         """Handle incoming news data"""

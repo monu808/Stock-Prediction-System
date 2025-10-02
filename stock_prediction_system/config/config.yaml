@@ -36,6 +36,12 @@ data_sources:
     enabled: true
     # Additional yahoo options can be added if needed
 
+  mock_provider:
+    enabled: true
+    default_price: 150.0
+    # optional per-symbol seed prices (example)
+    seed_prices: {}
+
 models:
   lstm_price: {}
   transformer_sentiment: {}
